@@ -99,7 +99,7 @@ def load_state_dict(model, loaded_state_dict):
     loaded_state_dict = strip_prefix_if_present(loaded_state_dict, prefix="module.")
     align_and_update_state_dicts(model_state_dict, loaded_state_dict)
 
-    if is_event:
+    if is_event and not 'backbone.body.stem.conv1.weight' in loaded_state_dict:
         deleted_keys = [ x for x in model_state_dict if 'stem' in x ]
         model_state_dict = { x : model_state_dict[x] for x in model_state_dict if not 'stem' in x }
         for key in deleted_keys:
