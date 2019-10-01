@@ -4,5 +4,7 @@ from .coco import COCODataset
 from .voc import PascalVOCDataset
 from .concat_dataset import ConcatDataset
 from .abstract import AbstractDataset
+from .kitti import EventKITTIObjectDataset
+from .mpii import EventMPIIObjectDataset
 
-__all__ = ["COCODataset", "ConcatDataset", "PascalVOCDataset", "AbstractDataset"]
+__all__ = ["COCODataset", "ConcatDataset", "PascalVOCDataset", "AbstractDataset","EventKITTIObjectDataset","EventMPIIObjectDataset"]

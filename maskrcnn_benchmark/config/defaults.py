@@ -20,6 +20,7 @@ from yacs.config import CfgNode as CN
 
 _C = CN()
 
+_C.NAME = "test"
 _C.MODEL = CN()
 _C.MODEL.RPN_ONLY = False
 _C.MODEL.MASK_ON = False

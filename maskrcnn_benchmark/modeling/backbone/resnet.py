@@ -350,8 +350,10 @@ class BaseStem(nn.Module):
 
         out_channels = cfg.MODEL.RESNETS.STEM_OUT_CHANNELS
 
+        is_events = any(['event' in dset for dset in cfg.DATASETS.TRAIN])
+        in_channels = 18 if is_events else 3
         self.conv1 = Conv2d(
-            3, out_channels, kernel_size=7, stride=2, padding=3, bias=False
+            in_channels, out_channels, kernel_size=7, stride=2, padding=3, bias=False
         )
         self.bn1 = norm_func(out_channels)
 

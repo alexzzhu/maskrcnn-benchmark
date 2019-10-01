@@ -3,10 +3,20 @@
 
 import os
 
-
 class DatasetCatalog(object):
     DATA_DIR = "datasets"
     DATASETS = {
+        "event_mpii_object_train": {
+            "data_dir": "mpii/training",
+            "hdf5_file": "mpii_skip2_cycle-bigskip-radam.hdf5",
+            "image_set": "mpii_event_train",
+            "npz_file": "/NAS/data/mpii_human_pose_v1_u12_2/extras/mpii_16_train_temporal.npz"
+        },
+        "event_kitti_object_train": {
+            "data_dir": "kitti/training",
+            "hdf5_file": "kitti_object_cycle-bigskip-radam.hdf5",
+            "image_set": "gan_event_train"
+        },
         "coco_2017_train": {
             "img_dir": "coco/train2017",
             "ann_file": "coco/annotations/instances_train2017.json"
@@ -128,6 +138,31 @@ class DatasetCatalog(object):
             )
             return dict(
                 factory="PascalVOCDataset",
+                args=args,
+            )
+        elif "kitti" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                data_dir=os.path.join(data_dir, attrs["data_dir"]),
+                hdf5_file=attrs["hdf5_file"],
+                image_set=attrs["image_set"],
+            )
+            return dict(
+                factory='EventKITTIObjectDataset',
+                args=args,
+            )
+        elif "mpii" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                data_dir=os.path.join(data_dir, attrs["data_dir"]),
+                hdf5_file=attrs["hdf5_file"],
+                image_set=attrs["image_set"],
+                npz_file=attrs["npz_file"]
+            )
+            return dict(
+                factory='EventMPIIObjectDataset',
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))

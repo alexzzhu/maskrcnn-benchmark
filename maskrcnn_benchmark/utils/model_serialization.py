@@ -37,6 +37,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     idxs[max_match_size == 0] = -1
 
     # used for logging
+    """
     max_size = max([len(key) for key in current_keys]) if current_keys else 1
     max_size_loaded = max([len(key) for key in loaded_keys]) if loaded_keys else 1
     log_str_template = "{: <{}} loaded from {: <{}} of shape {}"
@@ -56,7 +57,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
                 tuple(loaded_state_dict[key_old].shape),
             )
         )
-
+    """
 
 def strip_prefix_if_present(state_dict, prefix):
     keys = sorted(state_dict.keys())
@@ -67,14 +68,51 @@ def strip_prefix_if_present(state_dict, prefix):
         stripped_state_dict[key.replace(prefix, "")] = value
     return stripped_state_dict
 
+# https://code.activestate.com/recipes/577346-getattr-with-arbitrary-depth/
+def multi_getattr(obj, attr, default = None):
+    """
+    Get a named attribute from an object; multi_getattr(x, 'a.b.c.d') is
+    equivalent to x.a.b.c.d. When a default argument is given, it is
+    returned when any attribute in the chain doesn't exist; without
+    it, an exception is raised when a missing attribute is encountered.
+
+    """
+    attributes = attr.split(".")
+    for i in attributes:
+        try:
+            obj = getattr(obj, i)
+        except AttributeError:
+            if default:
+                return default
+            else:
+                raise
+    return obj
 
 def load_state_dict(model, loaded_state_dict):
     model_state_dict = model.state_dict()
+    is_event = False
+    if model_state_dict['backbone.body.stem.conv1.weight'].shape[1] != 3:
+        is_event = True
     # if the state_dict comes from a model that was wrapped in a
     # DataParallel or DistributedDataParallel during serialization,
     # remove the "module" prefix before performing the matching
     loaded_state_dict = strip_prefix_if_present(loaded_state_dict, prefix="module.")
     align_and_update_state_dicts(model_state_dict, loaded_state_dict)
 
+    if is_event:
+        deleted_keys = [ x for x in model_state_dict if 'stem' in x ]
+        model_state_dict = { x : model_state_dict[x] for x in model_state_dict if not 'stem' in x }
+        for key in deleted_keys:
+            var = multi_getattr(model, key)
+            if 'conv1.weight' in key:
+                torch.nn.init.normal_(var, std=0.001)
+            elif 'bn1.weight' in key:
+                torch.nn.init.uniform_(var)
+            elif 'bn1.bias' in key:
+                torch.nn.init.zeros_(var)
+            elif 'bn1.running_mean' in key:
+                torch.nn.init.zeros_(var)
+            elif 'bn1.running_var' in key:
+                torch.nn.init.ones_(var)
     # use strict loading
-    model.load_state_dict(model_state_dict)
+    model.load_state_dict(model_state_dict, strict=False)

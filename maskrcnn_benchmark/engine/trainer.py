@@ -69,11 +69,16 @@ def do_train(
         iou_types = iou_types + ("keypoints",)
     dataset_names = cfg.DATASETS.TEST
 
+    if not os.path.exists(os.path.join('logs', cfg.NAME)):
+        os.makedirs(os.path.join('logs', cfg.NAME))
+    
     for iteration, (images, targets, _) in enumerate(data_loader, start_iter):
-        
         if any(len(target) < 1 for target in targets):
-            logger.error(f"Iteration={iteration + 1} || Image Ids used for training {_} || targets Length={[len(target) for target in targets]}" )
+            logger.error("Iteration={iteration + 1} || Image Ids used for training {_} || targets Length={[len(target) for target in targets]}")
             continue
+        if time.time() - start_training_time > 3550:
+            checkpointer.save("model_{:07d}".format(iteration), **arguments)
+            break
         data_time = time.time() - end
         iteration = iteration + 1
         arguments["iteration"] = iteration
@@ -123,7 +128,8 @@ def do_train(
                     memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
                 )
             )
-        if iteration % checkpoint_period == 0:
+            
+        if iteration % checkpoint_period == 0 or iteration == 1:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
         if data_loader_val is not None and test_period > 0 and iteration % test_period == 0:
             meters_val = MetricLogger(delimiter="  ")
@@ -132,7 +138,8 @@ def do_train(
                 model,
                 # The method changes the segmentation mask format in a data loader,
                 # so every time a new data loader is created:
-                make_data_loader(cfg, is_train=False, is_distributed=(get_world_size() > 1), is_for_period=True),
+                make_data_loader(cfg, is_train=False,
+                                 is_distributed=(get_world_size() > 1), is_for_period=True),
                 dataset_name="[Validation]",
                 iou_types=iou_types,
                 box_only=False if cfg.MODEL.RETINANET_ON else cfg.MODEL.RPN_ONLY,
