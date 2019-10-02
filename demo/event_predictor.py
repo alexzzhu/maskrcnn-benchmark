@@ -44,28 +44,40 @@ class Resize(object):
         return image
 class EventDemo(object):
     # Human categories for pretty print
-    CATEGORIES = [
+    KITTI_CATEGORIES = [
+        "__background__",
+        "Car",
+        "Pedestrian",
+        "Cyclist",
+        "DontCare"
+        ]
+    
+    MPII_CATEGORIES = [
         "__background__",
         "person",
     ]
 
     def __init__(
-        self,
-        cfg,
-        confidence_threshold=0.5,
-        min_image_size=224,
-        weight_loading = None
+            self,
+            cfg,
+            confidence_threshold=0.7,
+            min_image_size=224,
+            weight_loading = None
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
-        self.model.eval()
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.model.to(self.device)
-        self.min_image_size = min_image_size
 
+        self.min_image_size = min_image_size
+        self.dataset = 'kitti' if 'kitti' in cfg.NAME else 'mpii'
+        self.categories = self.KITTI_CATEGORIES if 'kitti' in cfg.NAME else self.MPII_CATEGORIES
+        
         save_dir = cfg.OUTPUT_DIR
-        checkpointer = DetectronCheckpointer(cfg, self.model, save_dir=save_dir)
+        checkpointer = DetectronCheckpointer(self.cfg, self.model, save_dir=save_dir)
         checkpoint = checkpointer.load(cfg.MODEL.WEIGHT)
+
+        self.model.eval()
         
         if weight_loading:
             print('Loading weight from {}.'.format(weight_loading))
@@ -87,6 +99,7 @@ class EventDemo(object):
                 of the detection properties can be found in the fields of
                 the BoxList via `prediction.fields()`
         """
+
         predictions = self.compute_prediction(event_volume)
         top_predictions = self.select_top_predictions(predictions)
 
@@ -98,7 +111,7 @@ class EventDemo(object):
         result = cv2.cvtColor(result, cv2.COLOR_GRAY2BGR)
         
         result = self.overlay_boxes(result, top_predictions)
-        #result = self.overlay_class_names(result, top_predictions)
+        result = self.overlay_class_names(result, top_predictions)
 
         return result
 
@@ -115,6 +128,7 @@ class EventDemo(object):
         # convert to an ImageList, padded so that it is divisible by
         # cfg.DATALOADER.SIZE_DIVISIBILITY
         event_volume = event_volume.to(self.device)
+
         # compute predictions
         with torch.no_grad():
             predictions = self.model(event_volume)
@@ -143,11 +157,16 @@ class EventDemo(object):
                 the BoxList via `prediction.fields()`
         """
         scores = predictions.get_field("scores")
-        print scores
         keep = torch.nonzero(scores > self.confidence_threshold).squeeze(1)
         predictions = predictions[keep]
+        labels = predictions.get_field("labels")
+        person_label = 2 if self.dataset == 'kitti' else 1
+        keep = torch.nonzero(labels == person_label).squeeze(1)
+        predictions = predictions[keep]
+        
         scores = predictions.get_field("scores")
         _, idx = scores.sort(0, descending=True)
+
         return predictions[idx]
 
     def compute_colors_for_labels(self, labels):
@@ -202,7 +221,7 @@ class EventDemo(object):
         """
         scores = predictions.get_field("scores").tolist()
         labels = predictions.get_field("labels").tolist()
-        labels = [self.CATEGORIES[i] for i in labels]
+        labels = [self.categories[i] for i in labels]
         boxes = predictions.bbox
 
         template = "{}: {:.2f}"

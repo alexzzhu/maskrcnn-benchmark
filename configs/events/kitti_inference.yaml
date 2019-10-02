@@ -1,9 +1,10 @@
-NAME: "event-mpii"
+NAME: "event-kitti"
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "/home/alex/git/maskrcnn/logs/event-mpii/model_0010958.pth"
+  WEIGHT: "/home/alex/git/maskrcnn/logs/event-kitti/model_final.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
+    FREEZE_CONV_BODY_AT: -1
   RESNETS:
     BACKBONE_OUT_CHANNELS: 256
   RPN:
@@ -13,6 +14,8 @@ MODEL:
     PRE_NMS_TOP_N_TEST: 1000
     POST_NMS_TOP_N_TEST: 1000
     FPN_POST_NMS_TOP_N_TEST: 1000
+  FPN:
+    USE_RELU: True
   ROI_HEADS:
     USE_FPN: True
     SCORE_THRESH: 0.2
@@ -24,20 +27,25 @@ MODEL:
     POOLER_SAMPLING_RATIO: 2
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
     PREDICTOR: "FPNPredictor"
-    NUM_CLASSES: 2
-OUTPUT_DIR: logs/event-mpii/
+    NUM_CLASSES: 5
+OUTPUT_DIR: logs/event-kitti/
 DATASETS:
-  TRAIN: ("event_mpii_object_train",)
+  TRAIN: ("event_kitti_object_train",)
   #TEST: ("cityscapes_fine_instanceonly_seg_val_cocostyle",)
+INPUT:
+  MIN_SIZE_TRAIN: 260
+  MAX_SIZE_TRAIN: 288
+  MIN_SIZE_TEST: 260
+  MAX_SIZE_TEST: 288
 TEST:
   IMS_PER_BATCH: 2
 DATALOADER:
   SIZE_DIVISIBILITY: 32
   NUM_WORKERS: 8
 SOLVER:
-  BASE_LR: 0.01
+  BASE_LR: 0.0001
   WEIGHT_DECAY: 0.0001
   STEPS: (18000,)
-  MAX_ITER: 24000
-  IMS_PER_BATCH: 16
+  MAX_ITER: 40000
+  IMS_PER_BATCH: 32
   CHECKPOINT_PERIOD: 200000000000

@@ -5,6 +5,7 @@ MODEL:
   #WEIGHT: "logs/event-kitti/model_0000001.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
+    FREEZE_CONV_BODY_AT: -1
   RESNETS:
     BACKBONE_OUT_CHANNELS: 256
   RPN:
@@ -27,6 +28,11 @@ OUTPUT_DIR: logs/event-kitti/
 DATASETS:
   TRAIN: ("event_kitti_object_train",)
   #TEST: ("cityscapes_fine_instanceonly_seg_val_cocostyle",)
+INPUT:
+  MIN_SIZE_TRAIN: 260
+  MAX_SIZE_TRAIN: 288
+  MIN_SIZE_TEST: 260
+  MAX_SIZE_TEST: 288
 TEST:
   IMS_PER_BATCH: 2
 DATALOADER:
@@ -36,6 +42,6 @@ SOLVER:
   BASE_LR: 0.0001
   WEIGHT_DECAY: 0.0001
   STEPS: (18000,)
-  MAX_ITER: 24000
+  MAX_ITER: 40000
   IMS_PER_BATCH: 32
   CHECKPOINT_PERIOD: 200000000000
