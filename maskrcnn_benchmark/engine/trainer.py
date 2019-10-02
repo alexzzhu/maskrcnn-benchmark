@@ -6,7 +6,11 @@ import time
 
 import torch
 import torch.distributed as dist
+from tensorboardX import SummaryWriter
+from torchvision.utils import make_grid
 from tqdm import tqdm
+import numpy as np
+import cv2
 
 from maskrcnn_benchmark.data import make_data_loader
 from maskrcnn_benchmark.utils.comm import get_world_size, synchronize
@@ -14,6 +18,38 @@ from maskrcnn_benchmark.utils.metric_logger import MetricLogger
 from maskrcnn_benchmark.engine.inference import inference
 
 from apex import amp
+
+def compute_colors_for_labels(labels):
+    """
+    Simple function that adds fixed colors depending on the class
+    """
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    colors = labels[:, None] * palette
+    colors = (colors % 255).numpy().astype("uint8")
+    return colors
+
+def overlay_boxes(image, predictions):
+    """
+    Adds the predicted boxes on top of the image
+
+    Arguments:
+        image (np.ndarray): an image as returned by OpenCV
+        predictions (BoxList): the result of the computation by the model.
+            It should contain the field `labels`.
+    """
+    labels = predictions.get_field("labels").long()
+    boxes = predictions.bbox
+
+    colors = compute_colors_for_labels(labels).tolist()
+
+    for box, color in zip(boxes, colors):
+        box = box.to(torch.int64)
+        top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
+        image = cv2.rectangle(
+            image, tuple(top_left), tuple(bottom_right), tuple(color), 1
+        )
+
+    return image
 
 def reduce_loss_dict(loss_dict):
     """
@@ -69,9 +105,14 @@ def do_train(
         iou_types = iou_types + ("keypoints",)
     dataset_names = cfg.DATASETS.TEST
 
-    if not os.path.exists(os.path.join('logs', cfg.NAME)):
-        os.makedirs(os.path.join('logs', cfg.NAME))
-    
+    if not os.path.exists(cfg.OUTPUT_DIR):
+        os.makedirs(cfg.OUTPUT_DIR)
+        
+    if not os.path.exists(os.path.join(cfg.OUTPUT_DIR, 'tensorboard')):
+        os.makedirs(os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))
+        
+    summary_writer = SummaryWriter(os.path.join(cfg.OUTPUT_DIR, 'tensorboard'))
+        
     for iteration, (images, targets, _) in enumerate(data_loader, start_iter):
         if any(len(target) < 1 for target in targets):
             logger.error("Iteration={iteration + 1} || Image Ids used for training {_} || targets Length={[len(target) for target in targets]}")
@@ -79,7 +120,7 @@ def do_train(
         if time.time() - start_training_time > 3550:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
             break
-
+        
         data_time = time.time() - end
         iteration = iteration + 1
         arguments["iteration"] = iteration
@@ -87,7 +128,7 @@ def do_train(
         images = images.to(device)
         targets = [target.to(device) for target in targets]
 
-        loss_dict = model(images, targets)
+        loss_dict, predictions = model(images, targets)
 
         losses = sum(loss for loss in loss_dict.values())
 
@@ -95,7 +136,6 @@ def do_train(
         loss_dict_reduced = reduce_loss_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
         meters.update(loss=losses_reduced, **loss_dict_reduced)
-
         optimizer.zero_grad()
         # Note: If mixed precision is not used, this ends up doing nothing
         # Otherwise apply loss scaling for mixed-precision recipe
@@ -129,6 +169,40 @@ def do_train(
                     memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
                 )
             )
+            
+        if iteration % 200 == 0 or iteration == 1:
+            summary_writer.add_scalar("learning_rate", optimizer.param_groups[0]["lr"], iteration)
+            summary_writer.add_scalar("loss", losses_reduced, iteration)
+            for key in loss_dict_reduced:
+                summary_writer.add_scalar(key, loss_dict_reduced[key], iteration)
+
+            predictions = [o.to('cpu') for o in predictions]
+            targets = [o.to('cpu') for o in targets]
+            height, width = images.tensors.shape[2:]
+            predictions = [o.resize((width, height)) for o in predictions]
+
+            out = images.tensors.sum(1, keepdim=True).cpu().numpy()
+            out[out > 0] = 1
+            out = out.transpose(0, 2, 3, 1)
+            out *= 255.
+            out = out.astype(np.uint8)
+
+            out_pred = np.zeros((out.shape[:-1] + (3, )))
+            for i in range(out_pred.shape[0]):
+                out_pred[i] = overlay_boxes(cv2.cvtColor(out[i], cv2.COLOR_GRAY2BGR),
+                                            predictions[i])
+            out_pred = out_pred.transpose(0, 3, 1, 2).astype(np.uint8)
+
+            summary_writer.add_image("detections",
+                                     make_grid(torch.tensor(out_pred), nrow=4), iteration)
+            out_gt = np.zeros((out.shape[:-1] + (3, )))
+            for i in range(out_gt.shape[0]):
+                out_gt[i] = overlay_boxes(cv2.cvtColor(out[i], cv2.COLOR_GRAY2BGR),
+                                          targets[i])
+            out_gt = out_gt.transpose(0, 3, 1, 2).astype(np.uint8)
+            summary_writer.add_image("gt",
+                                     make_grid(torch.tensor(out_gt), nrow=4), iteration)
+            
             
         if iteration % checkpoint_period == 0 or iteration == 1:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
