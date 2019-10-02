@@ -37,6 +37,8 @@ def build_transforms(cfg, is_train=True):
         transform = T.Compose(
             [
                 T.ToTensor(),
+                T.RandomHorizontalFlipTensor(flip_horizontal_prob),
+                T.RandomVerticalFlipTensor(flip_vertical_prob),
             ]
         )
     else:

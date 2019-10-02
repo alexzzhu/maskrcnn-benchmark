@@ -60,8 +60,6 @@ class EventMPIIObjectDataset(torch.utils.data.Dataset):
         event_volume = self.event_volumes[int(img_id)]
         volume_shape = event_volume.shape
         
-        #img = cv2.imread(self._imgpath.format(img_id))
-
         target = self.get_groundtruth(index)
         target_resized = target.resize((volume_shape[1], volume_shape[0]))
         clipped_target = target_resized.clip_to_image(remove_empty=True)
