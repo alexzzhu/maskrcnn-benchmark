@@ -47,6 +47,9 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             continue
         key = current_keys[idx_new]
         key_old = loaded_keys[idx_old]
+        if not model_state_dict[key].shape == loaded_state_dict[key_old].shape:
+            continue
+        
         model_state_dict[key] = loaded_state_dict[key_old]
         #logger.info(
         #    log_str_template.format(
@@ -97,28 +100,25 @@ def load_state_dict(model, loaded_state_dict):
     # DataParallel or DistributedDataParallel during serialization,
     # remove the "module" prefix before performing the matching
     loaded_state_dict = strip_prefix_if_present(loaded_state_dict, prefix="module.")
-    align_and_update_state_dicts(model_state_dict, loaded_state_dict)
 
     if is_event and not 'backbone.body.stem.conv1.weight' in loaded_state_dict:
         print("First time restoring weights, setting stem to random initialization.")
         strict = False
         deleted_keys = [ x for x in model_state_dict if 'stem' in x ]
         model_state_dict = { x : model_state_dict[x] for x in model_state_dict if not 'stem' in x }
+
         for key in deleted_keys:
             var = multi_getattr(model, key)
             if 'conv1.weight' in key:
-                torch.nn.init.normal_(var, std=0.001)
+                torch.nn.init.normal_(var, std=.01)
             elif 'bn1.weight' in key:
                 torch.nn.init.uniform_(var)
             elif 'bn1.bias' in key:
                 torch.nn.init.zeros_(var)
-            elif 'bn1.running_mean' in key:
-                torch.nn.init.zeros_(var)
-            elif 'bn1.running_var' in key:
-                torch.nn.init.ones_(var)
     else:
         print("Previous correct stem weights found, using these.")        
         strict = True
+    align_and_update_state_dicts(model_state_dict, loaded_state_dict)
 
     # use strict loading
     model.load_state_dict(model_state_dict, strict=strict)

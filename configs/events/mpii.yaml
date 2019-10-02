@@ -1,8 +1,8 @@
 NAME: "event-mpii"
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  #WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
-  WEIGHT: "logs/event-mpii/model_0000001.pth"
+  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  #WEIGHT: "logs/event-mpii/model_0000001.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
   RESNETS:
@@ -33,9 +33,9 @@ DATALOADER:
   SIZE_DIVISIBILITY: 32
   NUM_WORKERS: 8
 SOLVER:
-  BASE_LR: 0.01
+  BASE_LR: 0.0001
   WEIGHT_DECAY: 0.0001
   STEPS: (18000,)
   MAX_ITER: 24000
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 32
   CHECKPOINT_PERIOD: 200000000000

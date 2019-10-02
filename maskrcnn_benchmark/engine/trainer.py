@@ -79,6 +79,7 @@ def do_train(
         if time.time() - start_training_time > 3550:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
             break
+
         data_time = time.time() - end
         iteration = iteration + 1
         arguments["iteration"] = iteration
