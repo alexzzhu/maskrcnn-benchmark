@@ -1,0 +1,41 @@
+NAME: "event-mpii"
+MODEL:
+  META_ARCHITECTURE: "GeneralizedRCNN"
+  #WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  WEIGHT: "/home/alex/git/maskrcnn/logs/event-mpii/model_final.pth"
+  BACKBONE:
+    CONV_BODY: "R-50-FPN"
+  RESNETS:
+    BACKBONE_OUT_CHANNELS: 256
+  RPN:
+    USE_FPN: True
+    ANCHOR_STRIDE: (4, 8, 16, 32, 64)
+    PRE_NMS_TOP_N_TRAIN: 2000
+    PRE_NMS_TOP_N_TEST: 1000
+    POST_NMS_TOP_N_TEST: 1000
+    FPN_POST_NMS_TOP_N_TEST: 1000
+  ROI_HEADS:
+    USE_FPN: True
+  ROI_BOX_HEAD:
+    POOLER_RESOLUTION: 7
+    POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
+    POOLER_SAMPLING_RATIO: 2
+    FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
+    PREDICTOR: "FPNPredictor"
+    NUM_CLASSES: 2
+OUTPUT_DIR: logs/event-mpii/
+DATASETS:
+  TRAIN: ("event_mpii_object_train",)
+  #TEST: ("cityscapes_fine_instanceonly_seg_val_cocostyle",)
+TEST:
+  IMS_PER_BATCH: 2
+DATALOADER:
+  SIZE_DIVISIBILITY: 32
+  NUM_WORKERS: 8
+SOLVER:
+  BASE_LR: 0.01
+  WEIGHT_DECAY: 0.0001
+  STEPS: (18000,)
+  MAX_ITER: 24000
+  IMS_PER_BATCH: 16
+  CHECKPOINT_PERIOD: 200000000000
