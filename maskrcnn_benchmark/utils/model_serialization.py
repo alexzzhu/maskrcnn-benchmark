@@ -100,6 +100,7 @@ def load_state_dict(model, loaded_state_dict):
     align_and_update_state_dicts(model_state_dict, loaded_state_dict)
 
     if is_event and not 'backbone.body.stem.conv1.weight' in loaded_state_dict:
+        print("First time restoring weights, setting stem to random initialization.")
         deleted_keys = [ x for x in model_state_dict if 'stem' in x ]
         model_state_dict = { x : model_state_dict[x] for x in model_state_dict if not 'stem' in x }
         for key in deleted_keys:
@@ -114,5 +115,7 @@ def load_state_dict(model, loaded_state_dict):
                 torch.nn.init.zeros_(var)
             elif 'bn1.running_var' in key:
                 torch.nn.init.ones_(var)
+    else:
+        print("Previous correct stem weights found, using these.")        
     # use strict loading
     model.load_state_dict(model_state_dict, strict=False)
